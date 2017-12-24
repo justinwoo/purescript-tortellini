@@ -1,5 +1,7 @@
 # PureScript-Tortellini
 
+[![Build Status](https://travis-ci.org/justinwoo/purescript-tortellini.svg?branch=master)](https://travis-ci.org/justinwoo/purescript-tortellini)
+
 A library for writing and reading from ini files.
 
 *Disclaimer:* this library does not aim to provide flexible ini support. Only what's easy.
