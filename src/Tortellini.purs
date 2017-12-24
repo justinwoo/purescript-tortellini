@@ -18,7 +18,6 @@ import Data.Traversable (traverse)
 import Global (readInt)
 import Text.Parsing.StringParser (ParseError)
 import Tortellini.Parser (parseIniDocument)
-import Type.Proxy (Proxy(..))
 import Type.Row (class RowLacks, class RowToList, Cons, Nil, RLProxy(..), kind RowList)
 
 data UhOhSpaghetto
@@ -55,19 +54,19 @@ parseIni' s = do
   pure $ Builder.build builder {}
 
 class ReadIniField a where
-  readIniField :: Proxy a -> String -> Except UhOhSpaghettios a
+  readIniField :: String -> Except UhOhSpaghettios a
 
 instance stringReadIniField :: ReadIniField String where
-  readIniField _ s = pure s
+  readIniField s = pure s
 
 instance intReadIniField :: ReadIniField Int where
-  readIniField _ s = maybe
+  readIniField s = maybe
     (throwError <<< pure <<< Error $ "Expected Int, got " <> s)
     pure
     $ fromNumber $ readInt 10 s
 
 instance booleanReadIniField :: ReadIniField Boolean where
-  readIniField _ s = case toLower s of
+  readIniField s = case toLower s of
     "true" -> pure true
     "false" -> pure false
     _ -> throwError <<< pure <<< Error $ "Expected true/false, got " <> s
@@ -75,8 +74,7 @@ instance booleanReadIniField :: ReadIniField Boolean where
 instance arrayReadIniField ::
   ( ReadIniField a
   ) => ReadIniField (Array a) where
-  readIniField _ s = traverse
-    (readIniField $ Proxy :: Proxy a)
+  readIniField s = traverse readIniField
     $ split (Pattern ",") s
 
 class ReadDocumentSections (xs :: RowList) (from :: # Type) (to :: # Type)
@@ -140,7 +138,7 @@ instance consReadSection ::
         throwError <<< pure <<< ErrorAtSectionProperty name <<< Error
         $ "Missing field in section"
       Just field -> do
-        value <- withExcept' $ readIniField (Proxy :: Proxy ty) field
+        value <- withExcept' $ readIniField field
         rest <- readSection (RLProxy :: RLProxy tail) sm
         let
           first :: Builder (Record from') (Record to)

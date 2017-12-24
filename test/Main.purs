@@ -21,20 +21,23 @@ seeds=4
 children=banana,grape,pineapple
 [section2]
 bat=grey
-[section3]
+[WOWSECTION]
+[麻婆豆腐]
 """
 
 type TestIni =
-  { "section1" ::
+  { section1 ::
        { fruit :: String
        , isRed :: Boolean
        , seeds :: Int
        , children :: Array String
        }
-  , "section2" ::
+  , section2 ::
        { bat :: String
        }
-  , "section3" ::
+  , "WOWSECTION" ::
+       {}
+  , "麻婆豆腐" ::
        {}
   }
 
