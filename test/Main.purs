@@ -3,7 +3,7 @@ module Test.Main where
 import Prelude
 
 import Control.Monad.Eff (Eff)
-import Data.Either (Either(Right, Left))
+import Data.Either (Either(Right, Left), either)
 import Data.Tuple (Tuple(..))
 import Test.Unit (failure, success, suite, test)
 import Test.Unit.Assert (assert, equal)
@@ -18,10 +18,8 @@ testDoc = """
 fruit=apple
 isRed=true
 seeds=4
+[MOOMINJUMALA]
 children=banana,grape,pineapple
-[section2]
-bat=grey
-[WOWSECTION]
 [麻婆豆腐]
 """
 
@@ -30,13 +28,10 @@ type TestIni =
        { fruit :: String
        , isRed :: Boolean
        , seeds :: Int
-       , children :: Array String
        }
-  , section2 ::
-       { bat :: String
+  , "MOOMINJUMALA" ::
+       { children :: Array String
        }
-  , "WOWSECTION" ::
-       {}
   , "麻婆豆腐" ::
        {}
   }
@@ -64,5 +59,14 @@ main = runTest do
           equal result.section1.fruit "apple"
           equal result.section1.isRed true
           equal result.section1.seeds 4
-          equal result.section1.children ["banana","grape","pineapple"]
-          equal result.section2.bat "grey"
+          equal result."MOOMINJUMALA".children ["banana","grape","pineapple"]
+    test "works2" do
+      case parseIni testDoc of
+        Left e -> failure $ show e
+        Right (result :: {section1 :: {fruit :: String}}) -> do
+          equal result.section1.fruit "apple"
+    test "works3" do
+      let
+        equal' :: {section1 :: {fruit :: String}} -> _
+        equal' r = equal r.section1.fruit "apple"
+      either (failure <<< show) equal' $ parseIni testDoc
