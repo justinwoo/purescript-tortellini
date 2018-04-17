@@ -9,7 +9,7 @@ import Test.Unit (failure, success, suite, test)
 import Test.Unit.Assert (assert, equal)
 import Test.Unit.Main (runTest)
 import Text.Parsing.StringParser (runParser)
-import Tortellini (parseIni)
+import Tortellini (parsellIni)
 import Tortellini.Parser (document, field, sectionName)
 
 testDoc :: String
@@ -51,9 +51,9 @@ main = runTest do
       case runParser document testDoc of
         Left e -> failure $ show e
         Right _ -> success
-  suite "parseIni" do
+  suite "parsellIni" do
     test "works" do
-      case parseIni testDoc of
+      case parsellIni testDoc of
         Left e -> failure $ show e
         Right (result :: TestIni) -> do
           equal result.section1.fruit "apple"
@@ -61,7 +61,7 @@ main = runTest do
           equal result.section1.seeds 4
           equal result."MOOMINJUMALA".children ["banana","grape","pineapple"]
     test "works2" do
-      case parseIni testDoc of
+      case parsellIni testDoc of
         Left e -> failure $ show e
         Right (result :: {section1 :: {fruit :: String}}) -> do
           equal result.section1.fruit "apple"
@@ -69,4 +69,4 @@ main = runTest do
       let
         equal' :: {section1 :: {fruit :: String}} -> _
         equal' r = equal r.section1.fruit "apple"
-      either (failure <<< show) equal' $ parseIni testDoc
+      either (failure <<< show) equal' $ parsellIni testDoc

@@ -50,9 +50,9 @@ type TestIni =
   }
   
 -- ...
-  suite "parseIni" do
+  suite "parsellIni" do
     test "works" do
-      case parseIni testDoc of
+      case parsellIni testDoc of
         Left e -> failure $ show e
         Right (result :: TestIni) -> do
           equal result.section1.fruit "apple"

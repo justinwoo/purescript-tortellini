@@ -33,22 +33,22 @@ instance showUhOhSpaghetto :: Show UhOhSpaghetto where
 
 type UhOhSpaghettios = NonEmptyList UhOhSpaghetto
 
-parseIni :: forall rl row
+parsellIni :: forall rl row
    . RowToList row rl
   => ReadDocumentSections rl () row
   => String
   -> Either UhOhSpaghettios (Record row)
-parseIni s = do
+parsellIni s = do
   doc <- lmap (pure <<< ErrorInParsing) $ parseIniDocument s
   builder <- runExcept $ readDocumentSections (RLProxy :: RLProxy rl) doc
   pure $ Builder.build builder {}
 
-parseIni' :: forall rl row
+parsellIni' :: forall rl row
    . RowToList row rl
   => ReadDocumentSections rl () row
   => String
   -> Except UhOhSpaghettios (Record row)
-parseIni' s = do
+parsellIni' s = do
   doc <- except $ lmap (pure <<< ErrorInParsing) $ parseIniDocument s
   builder <- readDocumentSections (RLProxy :: RLProxy rl) doc
   pure $ Builder.build builder {}
