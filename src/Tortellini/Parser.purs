@@ -7,16 +7,16 @@ import Control.Lazy (fix)
 import Data.Array (fromFoldable)
 import Data.Either (Either)
 import Data.List (List)
-import Data.StrMap (StrMap)
-import Data.StrMap as StrMap
 import Data.String (fromCharArray)
 import Data.Tuple (Tuple(..))
+import Foreign.Object (Object)
+import Foreign.Object as Object
 import Text.Parsing.StringParser (ParseError, Parser, runParser)
 import Text.Parsing.StringParser.Combinators (lookAhead, many1, many1Till, manyTill)
 import Text.Parsing.StringParser.String (anyChar, char, eof, oneOf, satisfy)
 
-type IniDocument = StrMap (StrMap String)
-type Section = Tuple String (StrMap String)
+type IniDocument = Object (Object String)
+type Section = Tuple String (Object String)
 type Field = Tuple String String
 
 parseIniDocument :: String -> Either ParseError IniDocument
@@ -57,11 +57,11 @@ field = lexeme do
 section :: Parser Section
 section = lexeme do
   name <- sectionName
-  body <- StrMap.fromFoldable <$> manyTill field
+  body <- Object.fromFoldable <$> manyTill field
     (lookAhead (char '[') *> pure unit <|> eof)
   pure $ Tuple name body
 
 document :: Parser IniDocument
 document = lexeme do
   skipSpace
-  StrMap.fromFoldable <$> many1 section
+  Object.fromFoldable <$> many1 section
