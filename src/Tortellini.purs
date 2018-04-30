@@ -18,6 +18,7 @@ import Data.Traversable (traverse)
 import Global (readInt)
 import Text.Parsing.StringParser (ParseError)
 import Tortellini.Parser (parseIniDocument)
+import Type.Prelude (RProxy(..))
 import Type.Row (class RowLacks, class RowToList, Cons, Nil, RLProxy(..), kind RowList)
 
 data UhOhSpaghetto
@@ -33,24 +34,24 @@ instance showUhOhSpaghetto :: Show UhOhSpaghetto where
 
 type UhOhSpaghettios = NonEmptyList UhOhSpaghetto
 
+type Parsellini a = Except UhOhSpaghettios a
+
 parsellIni :: forall rl row
    . RowToList row rl
-  => ReadDocumentSections rl () row
+  => ReadLevel rl () row (StrMap (StrMap String))
   => String
   -> Either UhOhSpaghettios (Record row)
 parsellIni s = do
-  doc <- lmap (pure <<< ErrorInParsing) $ parseIniDocument s
-  builder <- runExcept $ readDocumentSections (RLProxy :: RLProxy rl) doc
-  pure $ Builder.build builder {}
+  runExcept $ parsellIni' s
 
 parsellIni' :: forall rl row
    . RowToList row rl
-  => ReadDocumentSections rl () row
+  => ReadLevel rl () row (StrMap (StrMap String))
   => String
   -> Except UhOhSpaghettios (Record row)
 parsellIni' s = do
   doc <- except $ lmap (pure <<< ErrorInParsing) $ parseIniDocument s
-  builder <- readDocumentSections (RLProxy :: RLProxy rl) doc
+  builder <- readLevel (RLProxy :: RLProxy rl) doc
   pure $ Builder.build builder {}
 
 class ReadIniField a where
@@ -77,74 +78,89 @@ instance arrayReadIniField ::
   readIniField s = traverse readIniField
     $ split (Pattern ",") s
 
-class ReadDocumentSections (xs :: RowList) (from :: # Type) (to :: # Type)
-  | xs -> from to where
-  readDocumentSections ::
-       RLProxy xs
-    -> StrMap (StrMap String)
-    -> Except UhOhSpaghettios (Builder (Record from) (Record to))
+class ReadLevel
+  (xs :: RowList)
+  (from :: # Type) (to :: # Type)
+  strmap
+  | xs strmap -> from to
+  where
+    readLevel
+      :: RLProxy xs
+      -> strmap
+      -> Except UhOhSpaghettios (Builder { | from } { | to })
 
-instance nilReadDocumentSections ::
-  ReadDocumentSections Nil () () where
-  readDocumentSections _ _ = pure id
+instance nilReadLevel :: ReadLevel Nil () () strmap where
+  readLevel _ _ = pure id
 
-instance consReadDocumentSections ::
+instance consReadLevelSection ::
   ( IsSymbol name
-  , RowToList inner xs
-  , ReadSection xs () inner
-  , RowCons name (Record inner) from' to
-  , RowLacks name from'
-  , ReadDocumentSections tail from from'
-  ) => ReadDocumentSections (Cons name (Record inner) tail) from to where
-  readDocumentSections _ sm = do
-    case SM.lookup name sm of
-      Nothing ->
-        throwError <<< pure <<< ErrorAtDocumentProperty name <<< Error
-        $ "Missing section in document"
-      Just section -> do
-        builder <- withExcept' $ readSection (RLProxy :: RLProxy xs) section
-        let value = Builder.build builder {}
-        rest <- readDocumentSections (RLProxy :: RLProxy tail) sm
-        let
-          first :: Builder (Record from') (Record to)
-          first = Builder.insert nameP value
-        pure $ first <<< rest
-    where
-      nameP = SProxy :: SProxy name
-      name = reflectSymbol nameP
-      withExcept' = withExcept <<< map $ ErrorAtDocumentProperty name
-
-class ReadSection (xs :: RowList) (from :: # Type) (to :: # Type)
-  | xs -> from to where
-  readSection ::
-       RLProxy xs
-    -> StrMap String
-    -> Except UhOhSpaghettios (Builder (Record from) (Record to))
-
-instance nilReadSection ::
-  ReadSection Nil () () where
-  readSection _ _ = pure id
-
-instance consReadSection ::
-  ( IsSymbol name
-  , ReadIniField ty
-  , ReadSection tail from from'
   , RowCons name ty from' to
   , RowLacks name from'
-  ) => ReadSection (Cons name ty tail) from to where
-  readSection _ sm = do
-    case SM.lookup name sm of
-      Nothing ->
-        throwError <<< pure <<< ErrorAtSectionProperty name <<< Error
-        $ "Missing field in section"
-      Just field -> do
-        value <- withExcept' $ readIniField field
-        rest <- readSection (RLProxy :: RLProxy tail) sm
-        let
-          first :: Builder (Record from') (Record to)
-          first = Builder.insert nameP value
-        pure $ first <<< rest
-    where
-      nameP = SProxy :: SProxy name
-      name = reflectSymbol nameP
-      withExcept' = withExcept <<< map $ ErrorAtSectionProperty name
+  , ReadIniField ty
+  , ReadLevel tail from from' (StrMap String)
+  ) => ReadLevel (Cons name ty tail) from to (StrMap String) where
+  readLevel _ sm = do
+    levelOperation
+      { name: SProxy :: SProxy name
+      , from: RProxy :: RProxy from
+      , from': RProxy :: RProxy from'
+      , to: RProxy :: RProxy to
+      , tail: RLProxy :: RLProxy tail
+      }
+      ErrorAtSectionProperty
+      readIniField
+      readLevel
+      sm
+
+instance consReadLevelDocument ::
+  ( IsSymbol name
+  , RowCons name (Record inner) from' to
+  , RowLacks name from'
+  , RowToList inner xs
+  , ReadLevel xs () inner (StrMap String)
+  , ReadLevel tail from from' (StrMap (StrMap String))
+  ) => ReadLevel (Cons name (Record inner) tail) from to (StrMap (StrMap String)) where
+  readLevel _ sm = do
+    levelOperation
+      { name: SProxy :: SProxy name
+      , from: RProxy :: RProxy from
+      , from': RProxy :: RProxy from'
+      , to: RProxy :: RProxy to
+      , tail: RLProxy :: RLProxy tail
+      }
+      ErrorAtDocumentProperty
+      (map (Builder.build <@> {}) <<< (readLevel (RLProxy :: RLProxy xs)))
+      readLevel
+      sm
+
+levelOperation
+  :: forall item ty tail from from' to name
+   . IsSymbol name
+  => RowCons name ty from' to
+  => RowLacks name from'
+  => { name :: SProxy name
+     , from :: RProxy from
+     , from' :: RProxy from'
+     , to :: RProxy to
+     , tail :: RLProxy tail
+     }
+  -> (String -> UhOhSpaghetto -> UhOhSpaghetto)
+  -> (item -> Parsellini ty)
+  -> (RLProxy tail -> StrMap item -> Parsellini (Builder { | from } { | from' }))
+  -> StrMap item -> Parsellini (Builder { | from } { | to })
+levelOperation _ mkError fieldOp restOp sm =
+  case SM.lookup name sm of
+    Nothing ->
+      throwError <<< pure <<< mkError name <<< Error
+      $ "Missing property in level"
+    Just field -> do
+      let withExcept' = withExcept <<< map $ mkError name
+      value <- withExcept' $ fieldOp field
+      rest <- restOp (RLProxy :: RLProxy tail) sm
+      let
+        first :: Builder (Record from') (Record to)
+        first = Builder.insert nameP value
+      pure $ first <<< rest
+  where
+    nameP = SProxy :: SProxy name
+    name = reflectSymbol nameP
