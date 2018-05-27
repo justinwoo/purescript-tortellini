@@ -12,18 +12,19 @@
     "url": "git://github.com/justinwoo/purescript-tortellini.git"
   },
   "dependencies": {
-    "purescript-strings": "#compiler/0.12",
-    "purescript-typelevel-prelude": "#compiler/0.12",
-    "purescript-lists": "#compiler/0.12",
-    "purescript-record": "#compiler/0.12",
-    "purescript-string-parsers": "#compiler/0.12",
-    "purescript-transformers": "#compiler/0.12",
-    "purescript-prelude": "#compiler/0.12",
-    "purescript-numbers": "#compiler/0.12",
-    "purescript-integers": "#compiler/0.12",
-    "purescript-foreign-object": "*"
+    "purescript-strings": "^4.0.0",
+    "purescript-typelevel-prelude": "^3.0.0",
+    "purescript-lists": "^5.0.0",
+    "purescript-record": "^1.0.0",
+    "purescript-string-parsers": "^4.0.0",
+    "purescript-transformers": "^4.1.0",
+    "purescript-prelude": "^4.0.0",
+    "purescript-numbers": "^6.0.0",
+    "purescript-integers": "^4.0.0",
+    "purescript-foreign-object": "^1.0.0"
   },
   "devDependencies": {
-    "purescript-assert": "#compiler/0.12"
+    "purescript-assert": "^4.0.0",
+    "purescript-exceptions": "^4.0.0"
   }
 }
