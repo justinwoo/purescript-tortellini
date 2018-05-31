@@ -8,18 +8,20 @@ import Data.Either (Either)
 import Data.Int (fromNumber)
 import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..), maybe)
-import Data.Record.Builder (Builder)
-import Data.Record.Builder as Builder
-import Data.StrMap (StrMap)
-import Data.StrMap as SM
 import Data.String (Pattern(..), split, toLower)
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Data.Traversable (traverse)
+import Foreign.Object (Object)
+import Foreign.Object as SM
 import Global (readInt)
+import Prim.Row as Row
+import Prim.RowList (class RowToList, Cons, Nil, kind RowList)
+import Record.Builder (Builder)
+import Record.Builder as Builder
 import Text.Parsing.StringParser (ParseError)
 import Tortellini.Parser (parseIniDocument)
 import Type.Prelude (RProxy(..))
-import Type.Row (class RowLacks, class RowToList, Cons, Nil, RLProxy(..), kind RowList)
+import Type.Row (RLProxy(..))
 
 data UhOhSpaghetto
   = Error String
@@ -38,7 +40,7 @@ type Parsellini a = Except UhOhSpaghettios a
 
 parsellIni :: forall rl row
    . RowToList row rl
-  => ReadLevel rl () row (StrMap (StrMap String))
+  => ReadLevel rl () row (Object (Object String))
   => String
   -> Either UhOhSpaghettios (Record row)
 parsellIni s = do
@@ -46,12 +48,12 @@ parsellIni s = do
 
 parsellIni' :: forall rl row
    . RowToList row rl
-  => ReadLevel rl () row (StrMap (StrMap String))
+  => ReadLevel rl () row (Object (Object String))
   => String
   -> Except UhOhSpaghettios (Record row)
 parsellIni' s = do
   doc <- except $ lmap (pure <<< ErrorInParsing) $ parseIniDocument s
-  builder <- readLevel (RLProxy :: RLProxy rl) doc
+  builder :: Builder {} { | row } <- readLevel (RLProxy :: RLProxy rl) doc
   pure $ Builder.build builder {}
 
 class ReadIniField a where
@@ -90,16 +92,16 @@ class ReadLevel
       -> Except UhOhSpaghettios (Builder { | from } { | to })
 
 instance nilReadLevel :: ReadLevel Nil () () strmap where
-  readLevel _ _ = pure id
+  readLevel _ _ = pure identity
 
 instance consReadLevelSection ::
   ( IsSymbol name
-  , RowCons name ty from' to
-  , RowLacks name from'
+  , Row.Cons name ty from' to
+  , Row.Lacks name from'
   , ReadIniField ty
-  , ReadLevel tail from from' (StrMap String)
-  ) => ReadLevel (Cons name ty tail) from to (StrMap String) where
-  readLevel _ sm = do
+  , ReadLevel tail from from' (Object String)
+  ) => ReadLevel (Cons name ty tail) from to (Object String) where
+  readLevel _ =
     levelOperation
       { name: SProxy :: SProxy name
       , from: RProxy :: RProxy from
@@ -109,18 +111,16 @@ instance consReadLevelSection ::
       }
       ErrorAtSectionProperty
       readIniField
-      readLevel
-      sm
 
 instance consReadLevelDocument ::
   ( IsSymbol name
-  , RowCons name (Record inner) from' to
-  , RowLacks name from'
+  , Row.Cons name (Record inner) from' to
+  , Row.Lacks name from'
   , RowToList inner xs
-  , ReadLevel xs () inner (StrMap String)
-  , ReadLevel tail from from' (StrMap (StrMap String))
-  ) => ReadLevel (Cons name (Record inner) tail) from to (StrMap (StrMap String)) where
-  readLevel _ sm = do
+  , ReadLevel xs () inner (Object String)
+  , ReadLevel tail from from' (Object (Object String))
+  ) => ReadLevel (Cons name (Record inner) tail) from to (Object (Object String)) where
+  readLevel _ =
     levelOperation
       { name: SProxy :: SProxy name
       , from: RProxy :: RProxy from
@@ -130,14 +130,13 @@ instance consReadLevelDocument ::
       }
       ErrorAtDocumentProperty
       (map (Builder.build <@> {}) <<< (readLevel (RLProxy :: RLProxy xs)))
-      readLevel
-      sm
 
 levelOperation
   :: forall item ty tail from from' to name
    . IsSymbol name
-  => RowCons name ty from' to
-  => RowLacks name from'
+  => Row.Cons name ty from' to
+  => Row.Lacks name from'
+  => ReadLevel tail from from' (Object item)
   => { name :: SProxy name
      , from :: RProxy from
      , from' :: RProxy from'
@@ -146,9 +145,9 @@ levelOperation
      }
   -> (String -> UhOhSpaghetto -> UhOhSpaghetto)
   -> (item -> Parsellini ty)
-  -> (RLProxy tail -> StrMap item -> Parsellini (Builder { | from } { | from' }))
-  -> StrMap item -> Parsellini (Builder { | from } { | to })
-levelOperation _ mkError fieldOp restOp sm =
+  -> Object item
+  -> Parsellini (Builder { | from } { | to })
+levelOperation _ mkError fieldOp sm =
   case SM.lookup name sm of
     Nothing ->
       throwError <<< pure <<< mkError name <<< Error
@@ -156,7 +155,7 @@ levelOperation _ mkError fieldOp restOp sm =
     Just field -> do
       let withExcept' = withExcept <<< map $ mkError name
       value <- withExcept' $ fieldOp field
-      rest <- restOp (RLProxy :: RLProxy tail) sm
+      rest <- readLevel (RLProxy :: RLProxy tail) sm
       let
         first :: Builder (Record from') (Record to)
         first = Builder.insert nameP value
