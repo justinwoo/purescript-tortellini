@@ -51,12 +51,12 @@ main = do
   -- "sectionName"
   case runParser sectionName "[name]" of
     Left e -> throw $ show e
-    Right a -> assert' "should be 'name'" $ a == "name"
+    Right a -> assert' "section should be 'name'" $ a == "name"
 
   -- field
   case runParser field "apple=banana" of
     Left e -> throw $ show e
-    Right a -> assert' "should be 'name'" $ a == (Tuple "apple" "banana")
+    Right a -> assert' "field should be apple, banana" $ a == (Tuple "apple" "banana")
 
   -- document
   case runParser document testDoc of

@@ -7,12 +7,12 @@ import Control.Lazy (fix)
 import Data.Array (fromFoldable)
 import Data.Either (Either)
 import Data.Foldable (class Foldable)
-import Data.String.CodeUnits (dropRight, fromCharArray)
+import Data.String.CodeUnits (fromCharArray)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object)
 import Foreign.Object as Object
 import Text.Parsing.StringParser (ParseError, Parser, runParser)
-import Text.Parsing.StringParser.Combinators (lookAhead, many1, many1Till, manyTill)
+import Text.Parsing.StringParser.Combinators (lookAhead, many1, manyTill)
 import Text.Parsing.StringParser.String (char, eof, regex, satisfy)
 
 type IniDocument = Object (Object String)
@@ -38,19 +38,19 @@ skipSpace = fix \_ ->
 lexeme :: forall a. Parser a -> Parser a
 lexeme p = p <* skipSpace
 
-many1TillString :: forall a. Parser Char -> Parser a -> Parser String
-many1TillString p end = charListToString <$> many1Till p end
-
 sectionName :: Parser String
 sectionName = lexeme do
   _ <- char '['
-  dropRight 1 <$> regex ".*\\]"
+  s <- regex "[^\\]]*"
+  _ <- char ']'
+  pure s
 
 field :: Parser Field
 field = lexeme do
-  Tuple
-    <$> (dropRight 1 <$> regex ".*=")
-    <*> regex ".*"
+  key <- regex "[^=]*"
+  _ <- char '='
+  value <- regex ".*"
+  pure $ Tuple key value
 
 section :: Parser Section
 section = lexeme do
