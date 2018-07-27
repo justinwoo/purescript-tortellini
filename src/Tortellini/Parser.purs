@@ -13,7 +13,7 @@ import Foreign.Object (Object)
 import Foreign.Object as Object
 import Text.Parsing.StringParser (ParseError, Parser, runParser)
 import Text.Parsing.StringParser.Combinators (lookAhead, many1, manyTill)
-import Text.Parsing.StringParser.String (char, eof, regex, satisfy)
+import Text.Parsing.StringParser.CodeUnits (char, eof, regex, satisfy)
 
 type IniDocument = Object (Object String)
 type Section = Tuple String (Object String)
