@@ -20,16 +20,17 @@ import Record.Builder (Builder)
 import Record.Builder as Builder
 import Text.Parsing.StringParser (ParseError)
 import Tortellini.Parser (parseIniDocument)
-import Type.Prelude (RProxy(..))
-import Type.Row (RLProxy(..))
+import Type.Prelude (RLProxy(..))
 
 data UhOhSpaghetto
   = Error String
+  | ErrorMissingProperty
   | ErrorAtDocumentProperty String UhOhSpaghetto
   | ErrorAtSectionProperty String UhOhSpaghetto
   | ErrorInParsing ParseError
 instance showUhOhSpaghetto :: Show UhOhSpaghetto where
   show (Error s) = s
+  show ErrorMissingProperty = "ErrorMissingProperty"
   show (ErrorAtDocumentProperty s e) = "ErrorAtDocumentProperty " <> s <> " (" <> (show e) <> ")"
   show (ErrorAtSectionProperty s e) = "ErrorAtSectionProperty " <> s <> " (" <> (show e) <> ")"
   show (ErrorInParsing s) = "ErrorInParsing (" <> show s <> ")"
@@ -86,10 +87,7 @@ class ReadLevel
   strmap
   | xs strmap -> from to
   where
-    readLevel
-      :: RLProxy xs
-      -> strmap
-      -> Except UhOhSpaghettios (Builder { | from } { | to })
+    readLevel :: RLProxy xs -> strmap -> Except UhOhSpaghettios (Builder { | from } { | to })
 
 instance nilReadLevel :: ReadLevel Nil () () strmap where
   readLevel _ _ = pure identity
@@ -101,65 +99,44 @@ instance consReadLevelSection ::
   , ReadIniField ty
   , ReadLevel tail from from' (Object String)
   ) => ReadLevel (Cons name ty tail) from to (Object String) where
-  readLevel _ =
-    levelOperation
-      { name: SProxy :: SProxy name
-      , from: RProxy :: RProxy from
-      , from': RProxy :: RProxy from'
-      , to: RProxy :: RProxy to
-      , tail: RLProxy :: RLProxy tail
-      }
-      ErrorAtSectionProperty
-      readIniField
+  readLevel _ sm =
+    case SM.lookup name sm of
+      Nothing ->
+        throwError $ pure (ErrorAtSectionProperty name ErrorMissingProperty)
+      Just field -> do
+        let
+          withExcept' = withExcept <<< map $ ErrorAtSectionProperty name
+          tailP = RLProxy :: RLProxy tail
+          value = withExcept' (readIniField field)
+          rest = readLevel tailP sm
+          first = Builder.insert nameP <$> value
+        compose <$> first <*> rest
+    where
+      nameP = SProxy :: SProxy name
+      name = reflectSymbol nameP
 
-instance consReadLevelDocument ::
+else instance consReadLevelDocument ::
   ( IsSymbol name
   , Row.Cons name (Record inner) from' to
   , Row.Lacks name from'
   , RowToList inner xs
-  , ReadLevel xs () inner (Object String)
-  , ReadLevel tail from from' (Object (Object String))
-  ) => ReadLevel (Cons name (Record inner) tail) from to (Object (Object String)) where
-  readLevel _ =
-    levelOperation
-      { name: SProxy :: SProxy name
-      , from: RProxy :: RProxy from
-      , from': RProxy :: RProxy from'
-      , to: RProxy :: RProxy to
-      , tail: RLProxy :: RLProxy tail
-      }
-      ErrorAtDocumentProperty
-      (map (Builder.build <@> {}) <<< (readLevel (RLProxy :: RLProxy xs)))
-
-levelOperation
-  :: forall item ty tail from from' to name
-   . IsSymbol name
-  => Row.Cons name ty from' to
-  => Row.Lacks name from'
-  => ReadLevel tail from from' (Object item)
-  => { name :: SProxy name
-     , from :: RProxy from
-     , from' :: RProxy from'
-     , to :: RProxy to
-     , tail :: RLProxy tail
-     }
-  -> (String -> UhOhSpaghetto -> UhOhSpaghetto)
-  -> (item -> Parsellini ty)
-  -> Object item
-  -> Parsellini (Builder { | from } { | to })
-levelOperation _ mkError fieldOp sm =
-  case SM.lookup name sm of
-    Nothing ->
-      throwError <<< pure <<< mkError name <<< Error
-      $ "Missing property in level"
-    Just field -> do
-      let withExcept' = withExcept <<< map $ mkError name
-      value <- withExcept' $ fieldOp field
-      rest <- readLevel (RLProxy :: RLProxy tail) sm
-      let
-        first :: Builder (Record from') (Record to)
-        first = Builder.insert nameP value
-      pure $ first <<< rest
-  where
-    nameP = SProxy :: SProxy name
-    name = reflectSymbol nameP
+  , ReadLevel xs () inner a
+  , ReadLevel tail from from' (Object a)
+  ) => ReadLevel (Cons name (Record inner) tail) from to (Object a) where
+  readLevel _ sm =
+    case SM.lookup name sm of
+      Nothing ->
+        throwError $ pure (ErrorAtDocumentProperty name ErrorMissingProperty)
+      Just section -> do
+        let
+          withExcept' = withExcept <<< map $ ErrorAtSectionProperty name
+          tailP = RLProxy :: RLProxy tail
+          xsP = RLProxy :: RLProxy xs
+          builder = withExcept' (readLevel xsP section)
+          rest = readLevel tailP sm
+          value = Builder.build <@> {} <$> builder
+          first = Builder.insert nameP <$> value
+        compose <$> first <*> rest
+    where
+      nameP = SProxy :: SProxy name
+      name = reflectSymbol nameP
