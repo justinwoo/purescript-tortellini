@@ -21,7 +21,8 @@
     "purescript-prelude": "^4.1.0",
     "purescript-numbers": "^6.0.0",
     "purescript-integers": "^4.0.0",
-    "purescript-foreign-object": "^2.0.1"
+    "purescript-foreign-object": "^2.0.1",
+    "purescript-motsunabe": "^1.0.0"
   },
   "devDependencies": {
     "purescript-assert": "^4.0.0",

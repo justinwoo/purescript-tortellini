@@ -5,6 +5,7 @@ import Prelude
 import Control.Monad.Except (Except, except, runExcept, throwError, withExcept)
 import Data.Bifunctor (lmap)
 import Data.Either (Either)
+import Data.Foldable (intercalate)
 import Data.Int (fromNumber)
 import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..), maybe)
@@ -14,6 +15,7 @@ import Data.Traversable (traverse)
 import Foreign.Object (Object)
 import Foreign.Object as SM
 import Global (readInt)
+import Motsunabe (Doc(..), prettyWithoutTrailing)
 import Prim.Row as Row
 import Prim.RowList (class RowToList, Cons, Nil, kind RowList)
 import Record.Builder (Builder)
@@ -34,6 +36,18 @@ instance showUhOhSpaghetto :: Show UhOhSpaghetto where
   show (ErrorAtDocumentProperty s e) = "ErrorAtDocumentProperty " <> s <> " (" <> (show e) <> ")"
   show (ErrorAtSectionProperty s e) = "ErrorAtSectionProperty " <> s <> " (" <> (show e) <> ")"
   show (ErrorInParsing s) = "ErrorInParsing (" <> show s <> ")"
+
+printUhOhSpagghettios :: UhOhSpaghettios -> String
+printUhOhSpagghettios = prettyWithoutTrailing 80 <<< intercalate DLine <<< map uhOhSpaghettoToDoc
+
+uhOhSpaghettoToDoc :: UhOhSpaghetto -> Doc
+uhOhSpaghettoToDoc (Error s) = DText $ "Error: " <> s
+uhOhSpaghettoToDoc ErrorMissingProperty = DText "ErrorMissingProperty"
+uhOhSpaghettoToDoc (ErrorAtDocumentProperty p e) = DText ("ErrorAtDocumentProperty \"" <> p <> "\":") <> inner
+  where inner = DNest 1 $ DLine <> uhOhSpaghettoToDoc e
+uhOhSpaghettoToDoc (ErrorAtSectionProperty p e) = DText ("ErrorAtSectionProperty \"" <> p <> "\":") <> inner
+  where inner = DNest 1 $ DLine <> uhOhSpaghettoToDoc e
+uhOhSpaghettoToDoc (ErrorInParsing s) = DText "ErrorInParsing:" <> DNest 1 (DLine <> DText (show s))
 
 type UhOhSpaghettios = NonEmptyList UhOhSpaghetto
 
